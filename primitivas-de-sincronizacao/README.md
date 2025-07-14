@@ -33,39 +33,39 @@ Vamos dissecar o código e o papel de cada ferramenta:
 
 1. `sync.RWMutex` (O Porteiro Flexível)
 
-* O que é? Um Read-Write Mutex (bloqueio de leitura-escrita). Ele é mais inteligente que um Mutex normal.
+* O que é? Um `R`ead-`W`rite `Mutex` (bloqueio de leitura-escrita). Ele é mais inteligente que um `Mutex` normal.
 
 * Analogia: Pense em uma sala de biblioteca.
   - Muitas pessoas podem entrar para ler livros ao mesmo tempo (RLock).
   - Mas se alguém precisa escrever (modificar o catálogo), essa pessoa tranca a porta (Lock), e ninguém mais pode entrar (nem para ler, nem para escrever) até que ela termine.
 
 * No nosso código:
-  - Increment() precisa modificar o mapa visits, então ele usa m.mu.Lock() para obter acesso exclusivo.
-  - GetVisits() só precisa ler o mapa. Ele usa m.mu.RLock(), permitindo que centenas de goroutines leiam os dados de visita simultaneamente, desde que nenhuma esteja escrevendo. Isso melhora muito a performance em cenários com mais leituras do que escritas.
+  - `Increment()` precisa modificar o mapa `visits`, então ele usa `m.mu.Lock()` para obter acesso exclusivo.
+  - `GetVisits()` só precisa ler o mapa. Ele usa `m.mu.RLock()`, permitindo que centenas de goroutines leiam os dados de visita simultaneamente, desde que nenhuma esteja escrevendo. Isso melhora muito a performance em cenários com mais leituras do que escritas.
 
-2. sync/atomic (O Contador Especialista)
+2. `sync/atomic` (O Contador Especialista)
 
 * O que é? Um pacote que fornece operações de baixo nível, à prova de concorrência, para tipos numéricos. Essas operações são executadas como uma única instrução indivisível pelo processador.
 * Analogia: Um contador de "click" manual. Você pode apertar o botão para incrementar o número sem precisar de um ritual complexo de trancar e destrancar uma caixa. É uma ação única e segura.
 * No nosso código:
-  - atomic.AddUint64(&m.totalRequests, 1): Adiciona 1 ao nosso contador global. É muito mais rápido e eficiente do que usar um Mutex apenas para incrementar um número.
-  - atomic.LoadUint64(&m.totalRequests): Lê o valor atual do contador de forma segura.
+  - `atomic.AddUint64(&m.totalRequests, 1)`: Adiciona 1 ao nosso contador global. É muito mais rápido e eficiente do que usar um Mutex apenas para incrementar um número.
+  - `atomic.LoadUint64(&m.totalRequests)`: Lê o valor atual do contador de forma segura.
 
-3. sync.Once (O Ritual de Iniciação)
+3. `sync.Once` (O Ritual de Iniciação)
 
-* O que é? Um objeto que garante que uma determinada função será executada exatamente uma vez, não importa quantas goroutines tentem executá-la.
+* O que é? Um objeto que garante que uma determinada função será executada **exatamente uma vez**, não importa quantas goroutines tentem executá-la.
 * Analogia: A cerimônia de inauguração de uma ponte. A fita é cortada apenas uma vez, na primeira vez que alguém tenta atravessar. Todas as tentativas subsequentes simplesmente usam a ponte já inaugurada.
 * No nosso código:
-  - m.once.Do(m.initializeDB): Na primeira vez que Increment é chamado por qualquer goroutine, initializeDB será executado. Em todas as 1000 chamadas seguintes, o Do simplesmente retornará imediatamente, sem executar a função novamente. Perfeito para inicializações caras que só precisam acontecer uma vez.
+  - `m.once.Do(m.initializeDB)`: Na primeira vez que `Increment` é chamado por qualquer goroutine, `initializeDB` será executado. Em todas as 1000 chamadas seguintes, o `Do` simplesmente retornará imediatamente, sem executar a função novamente. Perfeito para inicializações caras que só precisam acontecer uma vez.
 
-4. sync.WaitGroup (O Coordenador da Chegada)
+4. `sync.WaitGroup` (O Coordenador da Chegada)
 
 * O que é? Um contador para esperar que uma coleção de goroutines termine sua execução.
-* Analogia: O gerente de uma equipe de entregadores. Ele sabe que tem 10 entregas para fazer (wg.Add(10)). Cada vez que um entregador volta, ele avisa (wg.Done()). O gerente só vai para casa (wg.Wait() retorna) quando todos os 10 entregadores tiverem retornado.
+* Analogia: O gerente de uma equipe de entregadores. Ele sabe que tem 10 entregas para fazer (`wg.Add(10)`). Cada vez que um entregador volta, ele avisa (`wg.Done()`). O gerente só vai para casa (`wg.Wait()` retorna) quando todos os 10 entregadores tiverem retornado.
 * No nosso código:
-  - wg.Add(numRequests): Informamos ao WaitGroup que estamos esperando por 1000 goroutines.
-  - defer wg.Done(): No início de cada goroutine, garantimos que, ao sair, ela decrementará o contador.
-  - wg.Wait(): A main goroutine para aqui e só continua quando o contador do WaitGroup chegar a zero.
+  - `wg.Add(numRequests)`: Informamos ao WaitGroup que estamos esperando por 1000 goroutines.
+  - `defer wg.Done()`: No início de cada goroutine, garantimos que, ao sair, ela decrementará o contador.
+  - `wg.Wait()`: A main goroutine para aqui e só continua quando o contador do WaitGroup chegar a zero.
 
 ## Resumo: Quando Usar o Quê?
 
